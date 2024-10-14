@@ -22,6 +22,7 @@ class Listener():
         self.event_signature = event_signature
         self.event_topic = Web3.keccak(text=event_signature).hex()
         self.json_file_path = json_file_path
+        log(f"Listener initalized with contract address {self.contract_address}, event signature {self.event_signature}, rpc url {self.rpc_url}, json file path {self.json_file_path}")
         log(f"Attempting subscription to events on {self.contract_address} with event {self.event_signature} on {self.rpc_url}")
 
     def handle_event(self, event):
@@ -57,7 +58,7 @@ class OperatorSocketListener(Listener):
         ip = decode(["string"], result["data"])[0]
         operator_id = '0x' + result["topics"][1].hex()
         log(f"Operator {operator_id} updated with IP: {ip}")
-        if validate_ip(ip) or validators.domain(ip):
+        if validate_ip(ip) or validate_domain(ip):
             # Read the JSON file
             with open(self.json_file_path, 'r') as file:
                 data = json.load(file)
@@ -98,6 +99,12 @@ class OperatorDeregistrationListener(Listener):
 def validate_ip(ip_string) -> bool:
     try:
         ipaddress.ip_address(ip_string)
+        return True
+    except ValueError:
+        return False
+def validate_domain(domain_string) -> bool:
+    try:
+        validators.domain(domain_string)
         return True
     except ValueError:
         return False

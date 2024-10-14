@@ -7,7 +7,6 @@ import ssl
 import os
 from dotenv import load_dotenv
 import json 
-
 def log(message):
     file = open("server.log.txt", "a")
     file.write(message + "\n")
@@ -18,12 +17,14 @@ def random_int():
     return random.randint(0, 255)
 
 # Get a random operator address
-def get_operator():
+def get_operator() -> str | None:
     rand_int = random_int()
     with open('operators.json', 'r') as file:
         data = json.load(file)
     log(f"Selecting from json data {data}")
     ip_addresses = [data[operator_id] for operator_id in data['operators']] 
+    if len(ip_addresses) == 0:
+        return None
     return ip_addresses[rand_int % len(ip_addresses)]
 
 # Proxy request handler
@@ -38,6 +39,9 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
 
         while attempts < max_attempts:
             operator = get_operator()
+            if operator is None:
+                self.send_error(500, "No operators available.")
+                return
             target_url = f"https://{operator}:7047"
             log(f"Selected operator IP: {operator} | Target URL: {target_url}")
 
