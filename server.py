@@ -33,9 +33,9 @@ def get_operator() -> str | None:
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         load_dotenv()
-        if os.getenv('PRIVATE_KEY') is None or os.getenv('MAX_OPERATOR_RETRY_ATTEMPTS') is None:
-            raise ValueError("PRIVATE_KEY and MAX_OPERATOR_RETRY_ATTEMPTS must be set")
-        self.private_key = os.getenv('PRIVATE_KEY')
+        if os.getenv('SERVER_PRIVATE_KEY') is None or os.getenv('MAX_OPERATOR_RETRY_ATTEMPTS') is None:
+            raise ValueError("SERVER_PRIVATE_KEY and MAX_OPERATOR_RETRY_ATTEMPTS must be set")
+        self.private_key = os.getenv('SERVER_PRIVATE_KEY')
         self.max_attempts = int(os.getenv('MAX_OPERATOR_RETRY_ATTEMPTS', 5))
         super().__init__(*args, **kwargs)
     def do_GET(self):
