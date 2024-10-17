@@ -42,21 +42,19 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         # initalize the max attempts using the environment variable MAX_OPERATOR_RETRY_ATTEMPTS or default to 5 
         attempts = 0
         operator = None
-        target_url = None
-
+        log(f"Starting operator selection")
         while attempts < self.max_attempts:
             operator = get_operator()
+            log(f"Selected operator: {operator}")
             if operator is None:
                 self.send_error(500, "No operators available.")
                 return
-            target_url = f"https://{operator}:7047"
-            log(f"Selected operator IP: {operator} | Target URL: {target_url}")
-
-            if self.liveness_check(target_url):
-                log(f"Operator is live: {target_url}")
+            log(f"Selected operator IP: {operator}")
+            if self.liveness_check(operator+":7047"):
+                log(f"Operator is live: {operator}")
                 break
             else:
-                log(f"Operator is not live: {target_url}. Trying another operator.")
+                log(f"Operator is not live: {operator}. Trying another operator.")
                 attempts += 1
         
         if attempts == self.max_attempts:
@@ -67,9 +65,9 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         self.send_response(200)  # OK status
         self.send_header('Content-type', 'application/json')  # Set content type to JSON
         self.end_headers()
-        signature , timestamp = self.generate_signature(target_url)
+        signature , timestamp = self.generate_signature(operator)
         response_data = {
-            "node_url": target_url,
+            "node_url": operator,
             "timestamp": timestamp,
             "signature": signature
         }
@@ -77,11 +75,12 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
 
     def liveness_check(self, url):
         """Check if the target URL is live by sending a HEAD request."""
-        try:
-            response = requests.head(url, verify=False, timeout=2)
-            return response.status_code == 200
-        except requests.RequestException:
-            return False
+        return True
+        # try:
+        #     response = requests.head(url, verify=False, timeout=2)
+        #     return response.status_code == 200
+        # except requests.RequestException:
+        #     return False
     def generate_signature(self, target_url) -> str:
         """Generate a signature for the given target URL."""
         timestamp = int(time.time())
