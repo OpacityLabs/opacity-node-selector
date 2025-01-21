@@ -78,9 +78,10 @@ def get_operator() -> str | None:
 
 # Proxy request handler
 class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
-    # Add class variable to track task number
+    # Initialize class variables
+    active_sessions = {}
     task_counter = 0
-
+    
     def __init__(self, *args, **kwargs):
         load_dotenv()
         if os.getenv('SERVER_PRIVATE_KEY') is None or os.getenv('MAX_OPERATOR_RETRY_ATTEMPTS') is None:
@@ -99,22 +100,35 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             body = self.rfile.read(content_length)
             data = json.loads(body)
+            # Convert operator_count to int
+            operator_count = int(data.get('operator_count', 1))
             log(f"Received data: {data}")
+            
+            # Validate commitment object first
+            commitment = Commitment.from_dict(data)
+            if not commitment.verify_signature():
+                self.send_error(400, "Invalid signature")
+                return
+            
+            commitment_hash = commitment.hash()
+            
+            # Create or get session
+            if commitment_hash not in self.active_sessions:
+                self.active_sessions[commitment_hash] = {
+                    'used_operators': set(),
+                    'remaining_count': operator_count
+                }
+            
+            session = self.active_sessions[commitment_hash]
+            operator = self._find_live_operator(session, commitment_hash)
+            
         except json.JSONDecodeError:
             self.send_error(400, "Invalid JSON")
             return
-
-        # Validate commitment object
-        try:
-            commitment = Commitment.from_dict(data)
         except (KeyError, ValueError):
             self.send_error(400, "Invalid Commitment object")
             return
-        if not commitment.verify_signature():
-            self.send_error(400, "Invalid signature")
-            return
 
-        operator = self._find_live_operator()
         if operator is None:
             self.send_error(500, "No live operators available.")
             return
@@ -123,8 +137,8 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
         ProxyHTTPRequestHandler.task_counter += 1
         self._send_json_response(operator, commitment, ProxyHTTPRequestHandler.task_counter)
 
-    def _find_live_operator(self) -> str | None:
-        """Attempts to find a live operator within the maximum retry attempts."""
+    def _find_live_operator(self, session, commitment_hash: str) -> str | None:
+        """Attempts to find an unused live operator for the session."""
         attempts = 0
         log("Starting operator selection")
         
@@ -135,9 +149,22 @@ class ProxyHTTPRequestHandler(BaseHTTPRequestHandler):
             if operator is None:
                 return None
                 
+            # Skip if operator already used in this session
             log(f"Selected operator IP: {operator}")
+            if operator in session['used_operators']:
+                attempts += 1
+                continue
+                
             if self.liveness_check(operator + ":7047"):
                 log(f"Operator is live: {operator}")
+                session['used_operators'].add(operator)
+                session['remaining_count'] -= 1
+                
+                # Clean up session if complete
+                if session['remaining_count'] == 0:
+                    log(f"Session complete, cleaning up {commitment_hash}")
+                    del self.active_sessions[commitment_hash]
+                    
                 return operator
             
             log(f"Operator is not live: {operator}. Trying another operator.")
