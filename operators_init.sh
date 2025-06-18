@@ -57,8 +57,8 @@ function get_operator() {
         fi
     fi
     latest_block=$(~/.foundry/bin/cast  block-number -r ${rpc_url})
-    latest_block=$(($latest_block - 1000))
-    socket_event_data=$(~/.foundry/bin/cast  logs --address ${registryCoordinator} --from-block ${latest_block} --to-block ${latest_block} "OperatorSocketUpdate(bytes32 indexed operatorId, string socket)" ${operatorID} -r ${rpc_url}  | grep 'data:' | awk '{print $2}')
+    from_block=$(($latest_block - 1000))
+    socket_event_data=$(~/.foundry/bin/cast  logs --address ${registryCoordinator} --from-block ${from_block} --to-block ${latest_block} "OperatorSocketUpdate(bytes32 indexed operatorId, string socket)" ${operatorID} -r ${rpc_url}  | grep 'data:' | awk '{print $2}')
     if [ $? -ne 0 ]; then
       echo -e "ERROR getting the socket event data"
       exit 1
