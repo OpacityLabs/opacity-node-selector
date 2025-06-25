@@ -10,6 +10,7 @@ import time
 from web3.auto import w3
 from eth_account.messages import encode_defunct
 from hexbytes import HexBytes
+from eth_abi import encode
 def log(message):
     file = open("server.log.txt", "a")
     file.write(message + "\n")
@@ -24,16 +25,13 @@ class Commitment:
         self.value = value
         self.threshold = threshold
     def hash(self):
-        # Create a dictionary of the commitment data
-        commitment_dict = self.to_dict()
-        # Convert to JSON string and encode to bytes
-        json_str = json.dumps(commitment_dict, sort_keys=True)
-        commitment_bytes = json_str.encode()
-        # Print exact bytes for debugging
-        print(f"Bytes to hash: {commitment_bytes}")
-        print(f"String to hash: {json_str}")
-        # Return keccak256 hash
-        return w3.keccak(commitment_bytes).hex()
+        # ABI encode the parameters before hashing
+        encoded_data = encode(
+            ['address', 'string', 'string', 'string', 'uint256', 'string'],
+            [self.address, self.platform, self.resource, self.value, self.threshold, self.signature]
+        )
+        print(f"Encoded data: {encoded_data.hex()}")
+        return w3.keccak(encoded_data).hex()
 
     def to_dict(self):
         return {
